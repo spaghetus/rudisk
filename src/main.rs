@@ -18,6 +18,7 @@ pub struct Opt {
 pub struct App {
 	search: Search,
 	last_sample: (Instant, u64, u64),
+	speed_record: u64,
 }
 
 impl eframe::App for App {
@@ -34,9 +35,15 @@ impl eframe::App for App {
 						.searched
 						.load(std::sync::atomic::Ordering::Relaxed);
 					let rate = count - self.last_sample.1;
+					if rate > self.speed_record {
+						self.speed_record = rate
+					}
 					self.last_sample = (Instant::now(), count, rate);
 				}
-				ui.label(format!("{}/s", self.last_sample.2));
+				ui.label(format!(
+					"{}/s, peak {}/s",
+					self.last_sample.2, self.speed_record
+				));
 				ui.separator();
 				ui.label(format!(
 					"{} searched, {} total size",
@@ -149,6 +156,7 @@ fn main() {
 			Box::new(App {
 				search,
 				last_sample: (Instant::now(), 0, 0),
+				speed_record: 0,
 			})
 		}),
 	)
