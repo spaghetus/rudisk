@@ -6,12 +6,11 @@ use std::{
 	path::PathBuf,
 	sync::{
 		atomic::{AtomicU64, Ordering::Relaxed},
-		mpsc::Sender,
 		Arc, RwLock,
 	},
 	thread::JoinHandle,
 };
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 #[derive(Default)]
 #[non_exhaustive]

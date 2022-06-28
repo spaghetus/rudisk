@@ -1,5 +1,9 @@
 use std::{
-	fs::File, os::unix::prelude::MetadataExt, path::PathBuf, sync::atomic::Ordering::Relaxed,
+	fs::File,
+	os::unix::prelude::MetadataExt,
+	path::PathBuf,
+	sync::atomic::Ordering::Relaxed,
+	time::{Duration, Instant},
 };
 
 use eframe::egui::{self, Ui};
@@ -13,20 +17,26 @@ pub struct Opt {
 
 pub struct App {
 	search: Search,
+	last_sample: (Instant, u64, u64),
 }
 
 impl eframe::App for App {
-	fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 		ctx.request_repaint();
 		egui::TopBottomPanel::top("top").show(ctx, |ui| {
 			ui.horizontal(|ui| {
 				egui::widgets::global_dark_light_mode_switch(ui);
 				ui.separator();
-				if self.search.is_finished() {
-					ui.label("Rudisk Done");
-				} else {
-					ui.label("Rudisk Working");
+				// Recalculate files/sec if applicable
+				if (Instant::now() - self.last_sample.0) > Duration::from_secs(1) {
+					let count = self
+						.search
+						.searched
+						.load(std::sync::atomic::Ordering::Relaxed);
+					let rate = count - self.last_sample.1;
+					self.last_sample = (Instant::now(), count, rate);
 				}
+				ui.label(format!("{}/s", self.last_sample.2));
 				ui.separator();
 				ui.label(format!(
 					"{} searched, {} total size",
@@ -36,7 +46,13 @@ impl eframe::App for App {
 					pretty_bytes::converter::convert(
 						self.search.size.load(std::sync::atomic::Ordering::Relaxed) as f64
 					)
-				))
+				));
+				ui.separator();
+				if self.search.is_finished() {
+					ui.label("Rudisk Done");
+				} else {
+					ui.label("Rudisk Working");
+				}
 			})
 		});
 		egui::CentralPanel::default().show(ctx, |ui| {
@@ -129,6 +145,11 @@ fn main() {
 	eframe::run_native(
 		"Rudisk",
 		Default::default(),
-		Box::new(|_| Box::new(App { search })),
+		Box::new(|_| {
+			Box::new(App {
+				search,
+				last_sample: (Instant::now(), 0, 0),
+			})
+		}),
 	)
 }
